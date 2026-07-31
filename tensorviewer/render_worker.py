@@ -180,11 +180,11 @@ class RenderWorker:
                     start
                 )
 
-
-                print(
-                    f"[render] {key} "
-                    f"{elapsed:.3f}s"
-                )
+                #
+                # print(
+                #     f"[render] {key} "
+                #     f"{elapsed:.3f}s"
+                # )
 
 
 

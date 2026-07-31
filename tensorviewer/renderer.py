@@ -303,14 +303,14 @@ def extract_images(
         )
 
 
-
-    print(
-        "render:",
-        mode,
-        tuple(t.shape),
-        "images:",
-        len(result)
-    )
+    #
+    # print(
+    #     "render:",
+    #     mode,
+    #     tuple(t.shape),
+    #     "images:",
+    #     len(result)
+    # )
 
 
     return result

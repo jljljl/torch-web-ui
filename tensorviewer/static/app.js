@@ -1,99 +1,82 @@
-// app.js
-
-
 let tensors = {};
-
 let tensorVersions = {};
-
 let selectedTensor = null;
 
-
 let settings = {
-
     mode: "single_bc",
-
     batch: 0,
-
     channel: 0,
-
     axes: "B,C,H,W",
-
     separate_norm: false
-
 };
+
+
+let imagePending = false;
+let imageDirty = false;
+let lastImageTime = 0;
+
+const IMAGE_FPS = 60;
+const IMAGE_INTERVAL = 1000 / IMAGE_FPS;
+
+
+let statePending = false;
 
 
 
 function $(id){
-
     return document.getElementById(id);
-
 }
 
 
-
-
-// --------------------------------------------------
-// console
-// --------------------------------------------------
 
 function log(...args){
 
     console.log(...args);
 
-
     const box = $("console");
-
 
     if(!box)
         return;
 
+    const row = document.createElement("div");
 
-    const row =
-        document.createElement("div");
-
-
-    row.textContent =
-        args.join(" ");
-
+    row.textContent = args.join(" ");
 
     box.appendChild(row);
 
+    while(box.children.length > 200)
+        box.removeChild(box.firstChild);
 
-    box.scrollTop =
-        box.scrollHeight;
-
+    box.scrollTop = box.scrollHeight;
 }
 
 
 
 
-// --------------------------------------------------
-// state
-// --------------------------------------------------
 
 async function fetchState(){
 
+    if(statePending)
+        return;
+
+
+    statePending = true;
+
+
     try{
 
-
-        const response =
-            await fetch(
-                "/state",
-                {
-                    cache:"no-store"
-                }
-            );
+        const r = await fetch(
+            "/state",
+            {
+                cache:"no-store"
+            }
+        );
 
 
-        tensors =
-            await response.json();
+        tensors = await r.json();
 
 
-
-        for(
-            const name in tensors
-        ){
+        for(const name in tensors){
 
             tensorVersions[name] =
                 tensors[name].version || 0;
@@ -101,9 +84,7 @@ async function fetchState(){
         }
 
 
-
         updateTensorList();
-
 
 
     }
@@ -115,99 +96,71 @@ async function fetchState(){
         );
 
     }
+    finally{
+
+        statePending = false;
+
+    }
 
 }
 
 
 
 
-// --------------------------------------------------
-// tensor list
-// --------------------------------------------------
 
 function updateTensorList(){
 
-
-    const select =
-        $("tensorSelect");
-
+    const select = $("tensorSelect");
 
     if(!select)
         return;
 
 
-
-    const previous =
-        selectedTensor;
-
+    const old = selectedTensor;
 
 
     select.innerHTML = "";
 
 
+    for(const name in tensors){
 
-    for(
-        const name in tensors
-    ){
-
-        const option =
+        const o =
             document.createElement(
                 "option"
             );
 
 
-        option.value =
-            name;
+        o.value = name;
 
 
-        option.textContent =
-            name
-            +
-            " "
-            +
+        o.textContent =
+            name +
+            " " +
             JSON.stringify(
                 tensors[name].shape
             );
 
 
-        select.appendChild(
-            option
-        );
+        select.appendChild(o);
 
     }
 
 
+    if(old && tensors[old]){
 
-
-    if(
-        previous &&
-        tensors[previous]
-    ){
-
-        selectedTensor =
-            previous;
+        selectedTensor = old;
 
     }
     else{
 
-
-        const names =
-            Object.keys(
-                tensors
-            );
-
-
-        if(names.length)
-            selectedTensor =
-                names[0];
+        selectedTensor =
+            Object.keys(tensors)[0] || null;
 
     }
 
 
-
     select.value =
         selectedTensor || "";
-
 
 
     updateSliders();
@@ -217,16 +170,11 @@ function updateTensorList(){
 
 
 
-// --------------------------------------------------
-// sliders
-// --------------------------------------------------
 
 function updateSliders(){
 
-
     if(!selectedTensor)
         return;
-
 
 
     const info =
@@ -237,19 +185,12 @@ function updateSliders(){
         return;
 
 
-
     const shape =
         info.shape;
 
 
-
-    const batch =
-        $("batchSlider");
-
-
-    const channel =
-        $("channelSlider");
-
+    const batch=$("batchSlider");
+    const channel=$("channelSlider");
 
 
     if(batch){
@@ -261,11 +202,14 @@ function updateSliders(){
             );
 
 
+        if(settings.batch > batch.max)
+            settings.batch=0;
+
+
         batch.value =
             settings.batch;
 
     }
-
 
 
 
@@ -278,62 +222,22 @@ function updateSliders(){
             );
 
 
+        if(settings.channel > channel.max)
+            settings.channel=0;
+
+
         channel.value =
             settings.channel;
 
     }
 
 
-
-    if(
-        settings.batch >
-        Number(batch.max)
-    ){
-
-        settings.batch=0;
-
-        batch.value=0;
-
-    }
+    $("batchValue").textContent =
+        settings.batch;
 
 
-
-    if(
-        settings.channel >
-        Number(channel.max)
-    ){
-
-        settings.channel=0;
-
-        channel.value=0;
-
-    }
-
-
-
-    if($("batchValue"))
-
-        $("batchValue").textContent =
-            settings.batch;
-
-
-
-    if($("channelValue"))
-
-        $("channelValue").textContent =
-            settings.channel;
-
-
-
-    log(
-        "slider update",
-        selectedTensor,
-        shape,
-        "B:",
-        batch ? batch.max : "-",
-        "C:",
-        channel ? channel.max : "-"
-    );
+    $("channelValue").textContent =
+        settings.channel;
 
 }
 
@@ -341,127 +245,33 @@ function updateSliders(){
 
 
 
-// --------------------------------------------------
-// websocket
-// --------------------------------------------------
+function requestImage(){
 
-function connectWS(){
+    imageDirty=true;
 
 
-    const proto =
-        location.protocol==="https:"
-        ?
-        "wss"
-        :
-        "ws";
+    const now =
+        performance.now();
 
 
-
-    const ws =
-        new WebSocket(
-            proto
-            +
-            "://"
-            +
-            location.host
-            +
-            "/events"
-        );
+    const delay =
+        IMAGE_INTERVAL -
+        (now-lastImageTime);
 
 
+    if(delay <= 0){
 
-    ws.onopen = ()=>{
+        updateImage();
 
-        log(
-            "websocket connected"
-        );
-
-    };
-
-
-
-    ws.onmessage = e=>{
-
-
-        let msg;
-
-
-        try{
-
-            msg =
-                JSON.parse(
-                    e.data
-                );
-
-        }
-        catch{
-
-            return;
-
-        }
-
-
-
-        log(
-            "WS",
-            JSON.stringify(msg)
-        );
-
-
-
-        if(
-            msg.type !==
-            "tensor_update"
-        )
-            return;
-
-
-
-        tensorVersions[msg.tensor] =
-            msg.version;
-
-
-
-        fetchState();
-
-
-
-        if(
-            msg.tensor === selectedTensor
-        ){
-
-            updateImage();
-
-        }
-
-
-    };
-
-
-
-    ws.onclose = ()=>{
-
-        log(
-            "websocket closed"
-        );
-
+    }
+    else{
 
         setTimeout(
-            connectWS,
-            1000
+            updateImage,
+            delay
         );
 
-    };
-
-
-
-    ws.onerror = ()=>{
-
-        log(
-            "websocket error"
-        );
-
-    };
+    }
 
 }
 
@@ -469,16 +279,24 @@ function connectWS(){
 
 
 
-// --------------------------------------------------
-// image
-// --------------------------------------------------
-
 function updateImage(){
+
+    if(!imageDirty)
+        return;
+
+
+    if(imagePending)
+        return;
 
 
     if(!selectedTensor)
         return;
 
+
+    imageDirty=false;
+
+    lastImageTime =
+        performance.now();
 
 
     const img =
@@ -490,42 +308,36 @@ function updateImage(){
 
 
 
-    const params =
+    const p =
         new URLSearchParams();
 
 
-
-    params.set(
+    p.set(
         "mode",
         settings.mode
     );
 
-
-    params.set(
+    p.set(
         "batch",
         settings.batch
     );
 
-
-    params.set(
+    p.set(
         "channel",
         settings.channel
     );
 
-
-    params.set(
+    p.set(
         "axes",
         settings.axes
     );
 
-
-    params.set(
+    p.set(
         "separate_norm",
         settings.separate_norm
     );
 
-
-    params.set(
+    p.set(
         "version",
         tensorVersions[selectedTensor] || 0
     );
@@ -533,27 +345,32 @@ function updateImage(){
 
 
     const url =
-        "/tensor/"
-        +
-        encodeURIComponent(
-            selectedTensor
-        )
-        +
-        "/image?"
-        +
-        params.toString();
+        "/tensor/" +
+        encodeURIComponent(selectedTensor) +
+        "/image?" +
+        p.toString();
 
 
 
-    log(
-        "image",
-        url
-    );
+    imagePending=true;
 
 
+    const done=()=>{
 
-    img.src =
-        url;
+        imagePending=false;
+
+
+        if(imageDirty)
+            requestImage();
+
+    };
+
+
+    img.onload=done;
+    img.onerror=done;
+
+
+    img.src=url;
 
 }
 
@@ -561,12 +378,92 @@ function updateImage(){
 
 
 
-// --------------------------------------------------
-// controls
-// --------------------------------------------------
+
+
+function connectWS(){
+
+    const proto =
+        location.protocol==="https:"
+        ?
+        "wss"
+        :
+        "ws";
+
+
+    const ws =
+        new WebSocket(
+            proto+
+            "://"+
+            location.host+
+            "/events"
+        );
+
+
+
+    ws.onmessage=e=>{
+
+
+        let msg;
+
+
+        try{
+
+            msg=JSON.parse(e.data);
+
+        }
+        catch{
+
+            return;
+
+        }
+
+
+
+        if(
+            msg.type !==
+            "tensor_update"
+        )
+            return;
+
+
+
+        tensorVersions[msg.tensor]=
+            msg.version;
+
+
+
+        fetchState();
+
+
+
+        if(
+            msg.tensor===selectedTensor
+        ){
+
+            requestImage();
+
+        }
+
+    };
+
+
+
+    ws.onclose=()=>{
+
+        setTimeout(
+            connectWS,
+            1000
+        );
+
+    };
+
+}
+
+
+
+
 
 function initControls(){
-
 
 
     $("tensorSelect")
@@ -574,28 +471,20 @@ function initControls(){
         "change",
         e=>{
 
-
             selectedTensor =
                 e.target.value;
 
 
-
             settings.batch=0;
-
             settings.channel=0;
-
 
 
             updateSliders();
 
-
-            updateImage();
-
+            requestImage();
 
         }
     );
-
-
 
 
 
@@ -604,18 +493,13 @@ function initControls(){
         "change",
         e=>{
 
-
             settings.mode =
                 e.target.value;
 
-
-            updateImage();
-
+            requestImage();
 
         }
     );
-
-
 
 
 
@@ -624,23 +508,18 @@ function initControls(){
         "input",
         e=>{
 
-
             settings.batch =
-                Number(
-                    e.target.value
-                );
+                Number(e.target.value);
 
 
             $("batchValue").textContent =
                 settings.batch;
 
 
-            updateImage();
+            requestImage();
 
         }
     );
-
-
 
 
 
@@ -649,23 +528,18 @@ function initControls(){
         "input",
         e=>{
 
-
             settings.channel =
-                Number(
-                    e.target.value
-                );
+                Number(e.target.value);
 
 
             $("channelValue").textContent =
                 settings.channel;
 
 
-            updateImage();
+            requestImage();
 
         }
     );
-
-
 
 
 
@@ -674,17 +548,14 @@ function initControls(){
         "change",
         e=>{
 
-
             settings.axes =
                 e.target.value;
 
 
-            updateImage();
+            requestImage();
 
         }
     );
-
-
 
 
 
@@ -693,16 +564,14 @@ function initControls(){
         "change",
         e=>{
 
-
             settings.separate_norm =
                 e.target.checked;
 
 
-            updateImage();
+            requestImage();
 
         }
     );
-
 
 }
 
@@ -710,31 +579,17 @@ function initControls(){
 
 
 
-// --------------------------------------------------
-// start
-// --------------------------------------------------
-
 window.addEventListener(
     "load",
     async ()=>{
 
-
-        log(
-            "starting viewer"
-        );
-
-
         initControls();
-
 
         await fetchState();
 
-
-        updateImage();
-
+        requestImage();
 
         connectWS();
-
 
     }
 );

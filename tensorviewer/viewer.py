@@ -12,8 +12,10 @@ from tensorviewer.params import params
 class TensorViewer:
 
 
-    def __init__(self):
+    def __init__(self,
+            verbose=False):
 
+        self.verbose = verbose
         self.params = params
 
         self.queue = Queue()
@@ -82,8 +84,8 @@ class TensorViewer:
                 if name in all_params
             }
 
-
-        print(
+        if self.verbose:
+            print(
             "PARAM UPDATE",
             data
         )
@@ -153,8 +155,8 @@ class TensorViewer:
                     name
                 )
 
-
-                print(
+                if self.verbose:
+                    print(
                     "updated",
                     name,
                     tensor.shape,
@@ -184,8 +186,8 @@ class TensorViewer:
 
 
             except Exception as e:
-
-                print(
+                if self.verbose:
+                    print(
                     "[viewer]",
                     e
                 )

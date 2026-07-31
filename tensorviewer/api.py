@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import time
 
 from fastapi import (
     APIRouter,
@@ -15,11 +16,11 @@ from fastapi.responses import Response
 from tensorviewer.renderer import render_tensor
 from tensorviewer.render_worker import RenderWorker
 from tensorviewer.state import state
-from tensorviewer.params import ParameterStore
 from tensorviewer.params import params
 
 
 router = APIRouter()
+
 
 worker = RenderWorker(
     max_cache=128
@@ -39,46 +40,31 @@ async def broadcast(message):
     if not clients:
         return
 
+
     data = json.dumps(message)
 
+
     dead = []
+
 
     for ws in list(clients):
 
         try:
-            await ws.send_text(data)
+
+            await ws.send_text(
+                data
+            )
 
         except Exception:
+
             dead.append(ws)
 
 
+
     for ws in dead:
+
         clients.discard(ws)
 
-
-
-async def state_watcher():
-
-    print(
-        "state watcher started"
-    )
-
-    while True:
-
-        event = await asyncio.to_thread(
-            state.events.get
-        )
-
-
-        await broadcast({
-
-            "type": "tensor_update",
-
-            "tensor": event["tensor"],
-
-            "version": event["version"]
-
-        })
 
 
 
@@ -89,7 +75,10 @@ async def events(ws: WebSocket):
 
     await ws.accept()
 
-    clients.add(ws)
+
+    clients.add(
+        ws
+    )
 
 
     print(
@@ -107,12 +96,92 @@ async def events(ws: WebSocket):
 
     except WebSocketDisconnect:
 
-        clients.discard(ws)
+        clients.discard(
+            ws
+        )
 
 
         print(
-            "websocket disconnected"
+            "websocket disconnected",
+            len(clients)
         )
+
+
+
+
+
+async def state_watcher():
+
+    print(
+        "state watcher started"
+    )
+
+
+    pending = {}
+
+
+    last_send = 0
+
+
+    interval = 1.0 / 60.0
+
+
+
+    while True:
+
+
+        event = await asyncio.to_thread(
+            state.events.get
+        )
+
+
+        pending[
+            event["tensor"]
+        ] = event["version"]
+
+
+
+        now = time.perf_counter()
+
+
+
+        if (
+            now - last_send
+            <
+            interval
+        ):
+
+            continue
+
+
+
+        last_send = now
+
+
+
+        updates = pending
+
+        pending = {}
+
+
+
+        for name, version in updates.items():
+
+
+            await broadcast({
+
+                "type":
+                    "tensor_update",
+
+                "tensor":
+                    name,
+
+                "version":
+                    version
+
+            })
+
+
 
 
 
@@ -129,6 +198,7 @@ async def get_state():
 
 
 
+
 # --------------------------------------------------
 # params
 # --------------------------------------------------
@@ -142,6 +212,7 @@ async def get_params():
 
 
 
+
 @router.post(
     "/params/{name}"
 )
@@ -152,15 +223,21 @@ async def set_param(
 
     params[name] = value
 
+
     return {
 
-        "ok": True,
+        "ok":
+            True,
 
-        "name": name,
+        "name":
+            name,
 
-        "value": params[name]
+        "value":
+            params[name]
 
     }
+
+
 
 
 
@@ -200,6 +277,8 @@ def make_key(
 
 
 
+
+
 def get_tensor(name):
 
     tensor = state.get(
@@ -216,6 +295,8 @@ def get_tensor(name):
 
 
     return tensor
+
+
 
 
 
@@ -238,6 +319,7 @@ async def tensor_image(
 
 ):
 
+
     tensor = get_tensor(
         name
     )
@@ -246,6 +328,7 @@ async def tensor_image(
     version = state.get_version(
         name
     )
+
 
 
     key = make_key(
@@ -257,6 +340,7 @@ async def tensor_image(
         axes,
         separate_norm
     )
+
 
 
     worker.submit(
@@ -284,14 +368,18 @@ async def tensor_image(
     )
 
 
+
     start = asyncio.get_running_loop().time()
+
 
 
     while True:
 
+
         result = worker.get(
             key
         )
+
 
 
         if result:
@@ -306,10 +394,12 @@ async def tensor_image(
                     media_type="image/png",
 
                     headers={
-                        "Cache-Control": "no-store"
+                        "Cache-Control":
+                            "no-store"
                     }
 
                 )
+
 
 
             if result["status"] == "error":
@@ -323,14 +413,17 @@ async def tensor_image(
 
         if (
             asyncio.get_running_loop().time()
-            - start
-            > 30
+            -
+            start
+            >
+            30
         ):
 
             raise HTTPException(
                 504,
                 "render timeout"
             )
+
 
 
         await asyncio.sleep(

@@ -127,11 +127,8 @@ def producer():
                 "layer2_weights",
                 model.conv2.weight
             )
-
-            print(
-                "updated batch",
-                images.shape
-            )
+            print("update")
+            time.sleep(0.001)
 
 
 
@@ -158,6 +155,8 @@ if __name__ == "__main__":
 
         port=8000,
 
-        reload=False
+        reload=False,
+
+        access_log=False,
 
     )
