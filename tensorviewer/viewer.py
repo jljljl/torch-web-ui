@@ -1,5 +1,3 @@
-# viewer.py
-
 import asyncio
 import threading
 from queue import Queue, Empty
@@ -7,12 +5,16 @@ from queue import Queue, Empty
 import torch
 
 from tensorviewer.state import state
+from tensorviewer.params import params
+
 
 
 class TensorViewer:
 
 
     def __init__(self):
+
+        self.params = params
 
         self.queue = Queue()
 
@@ -44,6 +46,54 @@ class TensorViewer:
 
 
 
+    # --------------------------------------------------
+    # parameters
+    # --------------------------------------------------
+
+    def register_parameter(
+            self,
+            name,
+            dtype
+    ):
+
+        self.params.register(
+            name,
+            dtype
+        )
+
+
+
+    def update_params(
+            self,
+            names=None
+    ):
+
+        if names is None:
+
+            data = self.params.get_dict()
+
+        else:
+
+            all_params = self.params.get_dict()
+
+            data = {
+                name: all_params[name]
+                for name in names
+                if name in all_params
+            }
+
+
+        print(
+            "PARAM UPDATE",
+            data
+        )
+
+
+
+    # --------------------------------------------------
+    # tensor update
+    # --------------------------------------------------
+
     def update(
             self,
             name,
@@ -51,9 +101,10 @@ class TensorViewer:
     ):
 
         if not isinstance(
-                tensor,
-                torch.Tensor
+            tensor,
+            torch.Tensor
         ):
+
             raise ValueError(
                 "Expected torch.Tensor"
             )
@@ -68,9 +119,14 @@ class TensorViewer:
 
 
 
+    # --------------------------------------------------
+    # worker
+    # --------------------------------------------------
+
     def _worker(self):
 
         while self.running:
+
 
             try:
 
@@ -82,6 +138,7 @@ class TensorViewer:
             except Empty:
 
                 continue
+
 
 
             try:
@@ -106,21 +163,24 @@ class TensorViewer:
                 )
 
 
-                if self.event_callback:
 
+                if (
+                    self.event_callback
+                    and
+                    self.loop
+                ):
 
-                    if self.loop:
+                    asyncio.run_coroutine_threadsafe(
 
+                        self.event_callback(
+                            name,
+                            version
+                        ),
 
-                        asyncio.run_coroutine_threadsafe(
+                        self.loop
 
-                            self.event_callback(
-                                name
-                            ),
+                    )
 
-                            self.loop
-
-                        )
 
 
             except Exception as e:
@@ -131,12 +191,17 @@ class TensorViewer:
                 )
 
 
+
             finally:
 
                 self.queue.task_done()
 
 
 
+    # --------------------------------------------------
+    # stop
+    # --------------------------------------------------
+
     def stop(self):
 
-        self.running=False
+        self.running = False

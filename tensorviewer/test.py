@@ -8,8 +8,8 @@ from torchvision import datasets, transforms
 
 import uvicorn
 
-from viewer import TensorViewer
-from server import app
+from tensorviewer.viewer import TensorViewer
+from tensorviewer.server import app
 
 
 # -------------------------------------------------------
@@ -54,7 +54,12 @@ class Net(nn.Module):
 
 viewer = TensorViewer()
 
-
+params = viewer.params
+viewer.register_parameter("lr", "float")
+viewer.register_parameter("myParam", "str")
+params["lr"] = 1e-4
+params["myParam"] = "Hello World!"
+viewer.update_params()
 # -------------------------------------------------------
 # Dataset
 # -------------------------------------------------------
@@ -128,7 +133,6 @@ def producer():
                 images.shape
             )
 
-            time.sleep(1)
 
 
 threading.Thread(

@@ -1,6 +1,5 @@
-# server.py
-
 import asyncio
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -10,10 +9,10 @@ from tensorviewer.api import (
     state_watcher
 )
 
-from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = PACKAGE_DIR / "static"
+
 
 if not STATIC_DIR.exists():
     raise RuntimeError(
@@ -43,19 +42,12 @@ app.include_router(
 # --------------------------------------------------
 
 app.mount(
-
     "/",
-
     StaticFiles(
-
         directory=STATIC_DIR,
-
         html=True
-
     ),
-
     name="static"
-
 )
 
 
@@ -68,19 +60,14 @@ watcher_task = None
 
 
 
-@app.on_event(
-    "startup"
-)
+@app.on_event("startup")
 async def startup():
-
 
     global watcher_task
 
 
     watcher_task = asyncio.create_task(
-
         state_watcher()
-
     )
 
 
@@ -90,12 +77,8 @@ async def startup():
 
 
 
-
-@app.on_event(
-    "shutdown"
-)
+@app.on_event("shutdown")
 async def shutdown():
-
 
     global watcher_task
 
@@ -104,6 +87,11 @@ async def shutdown():
 
         watcher_task.cancel()
 
+        try:
+            await watcher_task
+
+        except asyncio.CancelledError:
+            pass
 
 
     print(

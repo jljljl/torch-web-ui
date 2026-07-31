@@ -1,5 +1,3 @@
-# api.py
-
 import asyncio
 import hashlib
 import json
@@ -8,7 +6,8 @@ from fastapi import (
     APIRouter,
     HTTPException,
     WebSocket,
-    WebSocketDisconnect
+    WebSocketDisconnect,
+    Body
 )
 
 from fastapi.responses import Response
@@ -16,11 +15,11 @@ from fastapi.responses import Response
 from tensorviewer.renderer import render_tensor
 from tensorviewer.render_worker import RenderWorker
 from tensorviewer.state import state
-
+from tensorviewer.params import ParameterStore
+from tensorviewer.params import params
 
 
 router = APIRouter()
-
 
 worker = RenderWorker(
     max_cache=128
@@ -32,7 +31,7 @@ clients = set()
 
 
 # --------------------------------------------------
-# websocket broadcast
+# websocket
 # --------------------------------------------------
 
 async def broadcast(message):
@@ -40,37 +39,23 @@ async def broadcast(message):
     if not clients:
         return
 
-
     data = json.dumps(message)
 
-
     dead = []
-
 
     for ws in list(clients):
 
         try:
-
-            await ws.send_text(
-                data
-            )
-
+            await ws.send_text(data)
 
         except Exception:
-
             dead.append(ws)
 
 
-
     for ws in dead:
-
         clients.discard(ws)
 
 
-
-# --------------------------------------------------
-# state watcher
-# --------------------------------------------------
 
 async def state_watcher():
 
@@ -78,58 +63,37 @@ async def state_watcher():
         "state watcher started"
     )
 
-
     while True:
-
 
         event = await asyncio.to_thread(
             state.events.get
         )
 
 
-        print(
-            "broadcast",
-            event
-        )
-
-
         await broadcast({
 
-            "type":
-                "tensor_update",
+            "type": "tensor_update",
 
-            "tensor":
-                event["tensor"],
+            "tensor": event["tensor"],
 
-            "version":
-                event["version"]
+            "version": event["version"]
 
         })
 
 
-
-
-
-# --------------------------------------------------
-# websocket endpoint
-# --------------------------------------------------
 
 @router.websocket(
     "/events"
 )
 async def events(ws: WebSocket):
 
-
     await ws.accept()
 
-
-    clients.add(
-        ws
-    )
+    clients.add(ws)
 
 
     print(
-        "WS client connected",
+        "websocket connected",
         len(clients)
     )
 
@@ -143,19 +107,17 @@ async def events(ws: WebSocket):
 
     except WebSocketDisconnect:
 
-        clients.discard(
-            ws
-        )
+        clients.discard(ws)
 
 
         print(
-            "WS client disconnected"
+            "websocket disconnected"
         )
 
 
 
 # --------------------------------------------------
-# state api
+# state
 # --------------------------------------------------
 
 @router.get(
@@ -167,51 +129,54 @@ async def get_state():
 
 
 
-def get_tensor(name):
+# --------------------------------------------------
+# params
+# --------------------------------------------------
 
-    tensor = state.get(
-        name
-    )
+@router.get(
+    "/params"
+)
+async def get_params():
 
-
-    if tensor is None:
-
-        raise HTTPException(
-
-            404,
-
-            f"Tensor {name} not found"
-
-        )
+    return params.get_dict()
 
 
-    return tensor
 
+@router.post(
+    "/params/{name}"
+)
+async def set_param(
+        name: str,
+        value=Body(...)
+):
+
+    params[name] = value
+
+    return {
+
+        "ok": True,
+
+        "name": name,
+
+        "value": params[name]
+
+    }
 
 
 
 # --------------------------------------------------
-# render key
+# tensor image
 # --------------------------------------------------
 
 def make_key(
-
         name,
-
         version,
-
         mode,
-
         batch,
-
         channel,
-
         axes,
-
         separate_norm
-
 ):
-
 
     raw = "|".join(
         map(
@@ -235,30 +200,43 @@ def make_key(
 
 
 
+def get_tensor(name):
 
-# --------------------------------------------------
-# image
-# --------------------------------------------------
+    tensor = state.get(
+        name
+    )
+
+
+    if tensor is None:
+
+        raise HTTPException(
+            404,
+            f"Tensor {name} not found"
+        )
+
+
+    return tensor
+
+
 
 @router.get(
     "/tensor/{name}/image"
 )
 async def tensor_image(
 
-        name:str,
+        name: str,
 
-        mode:str="single_bc",
+        mode: str = "single_bc",
 
-        batch:int=0,
+        batch: int = 0,
 
-        channel:int=0,
+        channel: int = 0,
 
-        axes:str="B,C,H,W",
+        axes: str = "B,C,H,W",
 
-        separate_norm:bool=False
+        separate_norm: bool = False
 
 ):
-
 
     tensor = get_tensor(
         name
@@ -270,25 +248,15 @@ async def tensor_image(
     )
 
 
-
     key = make_key(
-
         name,
-
         version,
-
         mode,
-
         batch,
-
         channel,
-
         axes,
-
         separate_norm
-
     )
-
 
 
     worker.submit(
@@ -316,24 +284,20 @@ async def tensor_image(
     )
 
 
-
     start = asyncio.get_running_loop().time()
 
 
-
     while True:
-
 
         result = worker.get(
             key
         )
 
 
-
         if result:
 
 
-            if result["status"]=="done":
+            if result["status"] == "done":
 
                 return Response(
 
@@ -342,47 +306,33 @@ async def tensor_image(
                     media_type="image/png",
 
                     headers={
-
-                        "Cache-Control":
-                            "no-store"
-
+                        "Cache-Control": "no-store"
                     }
 
                 )
 
 
-            if result["status"]=="error":
+            if result["status"] == "error":
 
                 raise HTTPException(
-
                     500,
-
                     result["error"]
-
                 )
 
 
 
         if (
             asyncio.get_running_loop().time()
-            -
-            start
-            >
-            30
+            - start
+            > 30
         ):
 
             raise HTTPException(
-
                 504,
-
                 "render timeout"
-
             )
-
 
 
         await asyncio.sleep(
             0.01
         )
-
-
