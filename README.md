@@ -1,5 +1,6 @@
-````markdown
+
 # TorchWebUI
+```Warning! This is initial commit and may have bugs (but stable).```
 
 Web interface for PyTorch model debugging, tensor visualization and experiment control.
 
@@ -13,7 +14,10 @@ TorchWebUI helps you inspect what happens inside neural networks while they are 
 
 The goal is to provide a lightweight local browser interface for debugging deep learning models.
 
----
+
+<img width="2331" height="1290" alt="image" src="https://github.com/user-attachments/assets/9536c2f0-eaf5-42e4-bb1e-91250daace5a" />
+
+
 
 # Features
 
@@ -48,7 +52,50 @@ viewer.update(
     model.conv1.weight
 )
 ````
+# Torch Web UI vs Matplotlib
 
+TorchWebUI and Matplotlib are designed for different workflows.
+
+Matplotlib is a general-purpose scientific visualization library with a very wide range of plotting capabilities.
+
+TorchWebUI is a specialized interactive environment for **PyTorch model debugging and experiment control**:
+- tensor visualization;
+- model state inspection;
+- parameter control (planned);
+- console commands (planned).
+
+TorchWebUI does not try to replace Matplotlib. It focuses on understanding and controlling neural networks while they are running.
+
+---
+
+| Feature | TorchWebUI | Matplotlib |
+|---|---|---|
+| Web access | ✅ Browser-based interface | ❌ Usually tied to Python environment, notebook or exported images |
+| Live tensor updates | ✅ Built for continuously changing tensors | ⚠️ Requires manual refresh logic |
+| Neural network debugging | ✅ Designed for layers, activations and weights | ⚠️ Requires custom visualization code |
+| Tensor inspection | ✅ Direct PyTorch tensor visualization | ⚠️ Requires tensor conversion and plotting code |
+| Batch/channel navigation | ✅ Built-in | ❌ Manual implementation required |
+| Weight visualization | ✅ Designed for model parameters | ⚠️ Requires custom grid generation |
+| Console commands | ✅ Planned interactive commands | ❌ Not designed for model control |
+| Parameter editing | ✅ Planned tables, sliders and presets | ❌ Not available |
+| Remote browser access | ✅ Open through URL | ⚠️ Requires additional setup |
+| Setup for model debugging | ✅ Add viewer and call `update()` | ⚠️ Requires writing visualization code |
+| Scientific plots | ❌ Limited to tensors and model-related views | ✅ Extensive plotting ecosystem |
+| Publication figures | ❌ Not the main goal | ✅ Excellent support |
+
+---
+
+# Web accessibility
+
+## TorchWebUI
+
+A running model can expose its internal state through a browser:
+
+```python
+viewer.update(
+    "layer1_output",
+    tensor
+)
 ---
 
 # Installation
