@@ -8,7 +8,7 @@ from typing import Set
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from state import state
+from tensorviewer.state import state
 
 
 class ConnectionManager:

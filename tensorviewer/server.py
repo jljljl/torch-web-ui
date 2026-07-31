@@ -5,10 +5,21 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from api import (
+from tensorviewer.api import (
     router,
     state_watcher
 )
+
+from pathlib import Path
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = PACKAGE_DIR / "static"
+
+if not STATIC_DIR.exists():
+    raise RuntimeError(
+        f"Missing package static directory: {STATIC_DIR}"
+    )
+
 
 
 app = FastAPI(
@@ -37,7 +48,7 @@ app.mount(
 
     StaticFiles(
 
-        directory="static",
+        directory=STATIC_DIR,
 
         html=True
 

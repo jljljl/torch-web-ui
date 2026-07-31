@@ -4,7 +4,7 @@ import threading
 import queue
 import time
 
-from cache import ImageCache
+from tensorviewer.cache import ImageCache
 
 
 

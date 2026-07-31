@@ -6,7 +6,7 @@ from queue import Queue, Empty
 
 import torch
 
-from state import state
+from tensorviewer.state import state
 
 
 class TensorViewer:

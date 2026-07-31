@@ -13,9 +13,9 @@ from fastapi import (
 
 from fastapi.responses import Response
 
-from renderer import render_tensor
-from render_worker import RenderWorker
-from state import state
+from tensorviewer.renderer import render_tensor
+from tensorviewer.render_worker import RenderWorker
+from tensorviewer.state import state
 
 
 

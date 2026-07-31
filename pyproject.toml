@@ -1,0 +1,162 @@
+[build-system]
+requires = [
+    "setuptools>=68",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "torch-web-ui"
+
+version = "0.1.0"
+
+description = "Interactive PyTorch tensor visualization and experiment control web interface"
+
+readme = "README.md"
+
+requires-python = ">=3.6"
+
+
+authors = [
+    {name = "jljljl"}
+]
+
+
+license = {file = "LICENSE"}
+
+
+keywords = [
+    "pytorch",
+    "tensor",
+    "visualization",
+    "deep-learning",
+    "machine-learning",
+    "neural-network",
+    "debugging",
+    "fastapi",
+    "web-ui"
+]
+
+
+classifiers = [
+
+    "Development Status :: 3 - Alpha",
+
+    "Intended Audience :: Developers",
+
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+
+    "Topic :: Scientific/Engineering :: Visualization",
+
+    "Programming Language :: Python :: 3",
+
+    "Programming Language :: Python :: 3.9",
+
+    "Programming Language :: Python :: 3.10",
+
+    "Programming Language :: Python :: 3.11",
+
+    "Programming Language :: Python :: 3.12",
+
+    "License :: Other/Proprietary License"
+]
+
+
+dependencies = [
+
+    "fastapi>=0.110.0",
+
+    "uvicorn[standard]>=0.27.0",
+
+    "pillow>=10.0.0",
+
+    "numpy>=1.24.0",
+
+    "typing_extensions>=4.8.0"
+
+]
+
+
+[project.optional-dependencies]
+
+torch = [
+    "torch"
+]
+
+
+examples = [
+    "torchvision"
+]
+
+
+dev = [
+
+    "pytest>=8.0",
+
+    "black>=24.0",
+
+    "ruff>=0.3",
+
+    "build>=1.0",
+
+    "twine>=5.0"
+
+]
+
+
+[project.urls]
+
+Homepage = "https://github.com/jljljl/torch-web-ui"
+
+Repository = "https://github.com/jljljl/torch-web-ui"
+
+Issues = "https://github.com/jljljl/torch-web-ui/issues"
+
+
+
+[project.scripts]
+
+torch-web-ui = "torch_web_ui.cli:main"
+
+
+
+[tool.setuptools]
+
+package-dir = {"" = "src" }
+
+
+
+[tool.setuptools.packages.find]
+
+where = [
+    "src"
+]
+
+
+
+[tool.setuptools.package-data]
+
+torch_web_ui = [
+
+    "static/*.html",
+
+    "static/*.js",
+
+    "static/*.css",
+
+    "static/**/*"
+
+]
+
+
+
+[tool.ruff]
+
+line-length = 100
+
+
+
+[tool.black]
+
+line-length = 100
