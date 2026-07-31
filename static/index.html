@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Tensor Viewer</title>
+
+    <link rel="stylesheet" href="/style.css">
+
+</head>
+
+
+<body>
+
+
+<div class="layout">
+
+
+    <!-- LEFT PANEL -->
+
+    <aside class="sidebar">
+
+
+        <h1>
+            Tensor Viewer
+        </h1>
+
+
+
+        <section class="panel">
+
+            <h3>
+                Tensor
+            </h3>
+
+
+            <select id="tensorSelect">
+            </select>
+
+
+        </section>
+
+
+
+
+        <section class="panel">
+
+
+            <h3>
+                Mode
+            </h3>
+
+
+            <select id="modeSelect">
+
+
+                <option value="single_bc">
+                    1 B × 1 C
+                </option>
+
+
+                <option value="batch_all_channels">
+                    Batch / all channels
+                </option>
+
+
+                <option value="channel_all_batches">
+                    Channel / all batches
+                </option>
+
+
+                <option value="grid_bc">
+                    Grid B × C
+                </option>
+
+
+            </select>
+
+
+        </section>
+
+
+
+
+
+        <section class="panel">
+
+
+            <label>
+                Batch
+            </label>
+
+
+            <input
+                id="batchSlider"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+            >
+
+
+            <span id="batchValue">
+                0
+            </span>
+
+
+            <label>
+                Channel
+            </label>
+
+
+            <input
+                id="channelSlider"
+                type="range"
+                min="0"
+                max="0"
+                value="0"
+            >
+
+
+            <span id="channelValue">
+                0
+            </span>
+
+
+        </section>
+
+
+
+
+
+        <section class="panel">
+
+
+            <label>
+                Axes
+            </label>
+
+
+            <input
+                id="axesInput"
+                value="B,C,H,W"
+            >
+
+
+        </section>
+
+
+
+
+
+        <section class="panel checkbox">
+
+
+            <label>
+
+                <input
+                    id="separateNorm"
+                    type="checkbox"
+                >
+
+                Separate normalization
+
+            </label>
+
+
+        </section>
+
+
+
+
+
+        <section class="panel">
+
+
+            <h3>
+                Console
+            </h3>
+
+
+            <div id="console">
+            </div>
+
+
+        </section>
+
+
+    </aside>
+
+
+
+
+
+    <!-- VIEW -->
+
+    <main class="viewer">
+
+
+        <img
+            id="tensorImage"
+            alt="tensor"
+        >
+
+
+    </main>
+
+
+
+</div>
+
+
+
+
+<script src="/app.js"></script>
+
+
+</body>
+
+</html>

@@ -1,0 +1,33 @@
+Torch Web UI Non-Commercial License
+
+Copyright (c) 2026 Torch Web UI contributors
+
+Since this project is made alone:
+
+1. Permission is granted to use, copy, modify, and distribute this software
+for personal, educational, research, and other non-commercial purposes.
+
+
+2. Commercial use is NOT permitted without prior written permission from
+the copyright holders.
+
+Commercial use includes, but is not limited to:
+
+- using this software as part of a commercial product or service;
+- providing paid access to software or services based on this software;
+- using this software internally for commercial business operations;
+- bundling this software into commercial tools or platforms.
+
+
+3. Any modified versions distributed under this license must retain this
+license notice.
+
+
+4. This software is provided "AS IS", without warranty of any kind,
+express or implied.
+
+The authors are not liable for any claim, damages, or other liability
+arising from the use of this software.
+
+
+5. To obtain a commercial license, please contact the copyright holders.

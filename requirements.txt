@@ -1,0 +1,15 @@
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pillow>=10.0.0
+numpy>=1.24.0
+
+# PyTorch intentionally without version pin
+torch
+torchvision
+matplotlib
+
+# image / tensor helpers
+typing_extensions>=4.8.0
+
+# optional but useful for notebooks and colab
+nest_asyncio>=1.5.8
