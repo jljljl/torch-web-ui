@@ -1,26 +1,28 @@
 let tensors = {};
-let tensorVersions = {};
 let selectedTensor = null;
 
 let settings = {
-    mode: "single_bc",
-    batch: 0,
-    channel: 0,
-    axes: "B,C,H,W",
-    separate_norm: false
+
+    mode:"single_bc",
+
+    batch:0,
+
+    channel:0,
+
+    order:"bchw",
+
+    axes:"B,C,H,W",
+
+    separate_norm:false
+
 };
 
 
-let imagePending = false;
-let imageDirty = false;
-let lastImageTime = 0;
+let renderTimer = null;
+let rendering = false;
 
-const IMAGE_FPS = 60;
-const IMAGE_INTERVAL = 1000 / IMAGE_FPS;
-
-
-let statePending = false;
-
+const FPS = 60;
+const FRAME = 1000 / FPS;
 
 
 function $(id){
@@ -29,169 +31,139 @@ function $(id){
 
 
 
-function log(...args){
+// -----------------------------
+// tensors
+// -----------------------------
 
-    console.log(...args);
-
-    const box = $("console");
-
-    if(!box)
-        return;
-
-    const row = document.createElement("div");
-
-    row.textContent = args.join(" ");
-
-    box.appendChild(row);
-
-    while(box.children.length > 200)
-        box.removeChild(box.firstChild);
-
-    box.scrollTop = box.scrollHeight;
-}
-
-
-
-
-
-async function fetchState(){
-
-    if(statePending)
-        return;
-
-
-    statePending = true;
-
+async function loadTensors(){
 
     try{
 
-        const r = await fetch(
-            "/state",
-            {
-                cache:"no-store"
-            }
-        );
+        const r =
+            await fetch(
+                "/tensors",
+                {
+                    cache:"no-store"
+                }
+            );
 
+        tensors =
+            await r.json();
 
-        tensors = await r.json();
-
-
-        for(const name in tensors){
-
-            tensorVersions[name] =
-                tensors[name].version || 0;
-
-        }
-
-
-        updateTensorList();
-
+        renderTensorList();
 
     }
     catch(e){
 
-        log(
-            "state error",
+        console.log(
+            "tensor list error",
             e
         );
 
     }
-    finally{
-
-        statePending = false;
-
-    }
 
 }
 
 
 
+function renderTensorList(){
 
-
-function updateTensorList(){
-
-    const select = $("tensorSelect");
+    const select =
+        $("tensorSelect");
 
     if(!select)
         return;
 
+    const old =
+        selectedTensor;
 
-    const old = selectedTensor;
-
-
-    select.innerHTML = "";
-
+    select.innerHTML="";
 
     for(const name in tensors){
 
-        const o =
+        const t =
+            tensors[name];
+
+        const option =
             document.createElement(
                 "option"
             );
 
+        option.value =
+            name;
 
-        o.value = name;
-
-
-        o.textContent =
+        option.textContent =
             name +
             " " +
             JSON.stringify(
-                tensors[name].shape
+                t.shape
             );
 
-
-        select.appendChild(o);
+        select.appendChild(
+            option
+        );
 
     }
 
+    if(
+        old &&
+        tensors[old]
+    ){
 
-    if(old && tensors[old]){
-
-        selectedTensor = old;
+        selectedTensor =
+            old;
 
     }
     else{
 
+        const keys =
+            Object.keys(
+                tensors
+            );
+
         selectedTensor =
-            Object.keys(tensors)[0] || null;
+            keys.length
+            ?
+            keys[0]
+            :
+            null;
 
     }
-
 
     select.value =
         selectedTensor || "";
 
-
     updateSliders();
+
+    scheduleDraw();
 
 }
 
 
 
-
+// -----------------------------
+// sliders
+// -----------------------------
 
 function updateSliders(){
 
     if(!selectedTensor)
         return;
 
-
-    const info =
+    const t =
         tensors[selectedTensor];
 
-
-    if(!info || !info.shape)
+    if(!t)
         return;
 
-
     const shape =
-        info.shape;
+        t.shape;
 
+    const batch =
+        $("batchSlider");
 
-    const batch=$("batchSlider");
-    const channel=$("channelSlider");
-
+    const channel =
+        $("channelSlider");
 
     if(batch){
 
@@ -201,17 +173,20 @@ function updateSliders(){
                 shape[0]-1
             );
 
-
-        if(settings.batch > batch.max)
+        if(
+            settings.batch >
+            Number(batch.max)
+        )
             settings.batch=0;
-
 
         batch.value =
             settings.batch;
 
+        if($("batchValue"))
+            $("batchValue").textContent =
+                settings.batch;
+
     }
-
-
 
     if(channel){
 
@@ -221,164 +196,308 @@ function updateSliders(){
                 shape[1]-1
             );
 
-
-        if(settings.channel > channel.max)
+        if(
+            settings.channel >
+            Number(channel.max)
+        )
             settings.channel=0;
-
 
         channel.value =
             settings.channel;
 
+        if($("channelValue"))
+            $("channelValue").textContent =
+                settings.channel;
+
     }
 
+    if($("modeSelect"))
+        $("modeSelect").value =
+            settings.mode;
 
-    $("batchValue").textContent =
-        settings.batch;
+    if($("axesInput"))
+        $("axesInput").value =
+            settings.axes;
 
-
-    $("channelValue").textContent =
-        settings.channel;
+    if($("separateNorm"))
+        $("separateNorm").checked =
+            settings.separate_norm;
 
 }
 
 
 
+// -----------------------------
+// scheduler
+// -----------------------------
 
+function scheduleDraw(){
 
-function requestImage(){
+    if(renderTimer)
+        return;
 
-    imageDirty=true;
-
-
-    const now =
-        performance.now();
-
-
-    const delay =
-        IMAGE_INTERVAL -
-        (now-lastImageTime);
-
-
-    if(delay <= 0){
-
-        updateImage();
-
-    }
-    else{
-
+    renderTimer =
         setTimeout(
-            updateImage,
-            delay
+
+            ()=>{
+
+                renderTimer=null;
+
+                drawCurrent();
+
+            },
+
+            FRAME
+
         );
 
-    }
+}
+
+
+
+// -----------------------------
+// tensor loading
+// -----------------------------
+
+async function getTile(
+
+    name,
+    b,
+    c
+
+){
+
+    const url =
+        `/tensors/${encodeURIComponent(name)}/get/${b}/${c}/${settings.order}`;
+
+    const r =
+        await fetch(
+            url,
+            {
+                cache:"no-store"
+            }
+        );
+
+    if(!r.ok)
+        throw new Error(
+            url +
+            " " +
+            r.status
+        );
+
+    const buffer =
+        await r.arrayBuffer();
+
+    return{
+
+        buffer,
+
+        batch:b,
+
+        channel:c
+
+    };
 
 }
 
 
 
+// -----------------------------
+// drawing
+// -----------------------------
 
+async function drawCurrent(){
 
-function updateImage(){
-
-    if(!imageDirty)
+    if(rendering)
         return;
-
-
-    if(imagePending)
-        return;
-
 
     if(!selectedTensor)
         return;
 
+    rendering=true;
 
-    imageDirty=false;
+    try{
 
-    lastImageTime =
-        performance.now();
+        const t =
+            tensors[selectedTensor];
 
+        if(!t)
+            return;
 
-    const img =
-        $("tensorImage");
+        const shape =
+            t.shape;
 
+        const B =
+            shape[0];
 
-    if(!img)
-        return;
+        const C =
+            shape[1];
 
+        const H =
+            shape[2];
 
+        const W =
+            shape[3];
 
-    const p =
-        new URLSearchParams();
+        const requests=[];
 
+        switch(settings.mode){
 
-    p.set(
-        "mode",
-        settings.mode
-    );
+            case "single_bc":
 
-    p.set(
-        "batch",
-        settings.batch
-    );
+                requests.push({
 
-    p.set(
-        "channel",
-        settings.channel
-    );
+                    b:settings.batch,
 
-    p.set(
-        "axes",
-        settings.axes
-    );
+                    c:settings.channel
 
-    p.set(
-        "separate_norm",
-        settings.separate_norm
-    );
+                });
 
-    p.set(
-        "version",
-        tensorVersions[selectedTensor] || 0
-    );
+                break;
 
 
+            case "batch_all_channels":
 
-    const url =
-        "/tensor/" +
-        encodeURIComponent(selectedTensor) +
-        "/image?" +
-        p.toString();
+                for(
+                    let c=0;
+                    c<C;
+                    c++
+                ){
 
+                    requests.push({
 
+                        b:settings.batch,
 
-    imagePending=true;
+                        c
 
+                    });
 
-    const done=()=>{
+                }
 
-        imagePending=false;
-
-
-        if(imageDirty)
-            requestImage();
-
-    };
+                break;
 
 
-    img.onload=done;
-    img.onerror=done;
+            case "channel_all_batches":
+
+                for(
+                    let b=0;
+                    b<B;
+                    b++
+                ){
+
+                    requests.push({
+
+                        b,
+
+                        c:settings.channel
+
+                    });
+
+                }
+
+                break;
 
 
-    img.src=url;
+            case "grid_bc":
+
+            default:
+
+                for(
+                    let b=0;
+                    b<B;
+                    b++
+                ){
+
+                    for(
+                        let c=0;
+                        c<C;
+                        c++
+                    ){
+
+                        requests.push({
+
+                            b,
+
+                            c
+
+                        });
+
+                    }
+
+                }
+
+        }
+
+        const tiles=[];
+
+        for(
+            const r of requests
+        ){
+
+            const raw =
+                await getTile(
+
+                    selectedTensor,
+
+                    r.b,
+
+                    r.c
+
+                );
+
+            tiles.push({
+
+                ...raw,
+
+                width:W,
+
+                height:H
+
+            });
+
+        }
+
+        drawTensor(
+
+            tiles,
+
+            {
+
+                mode:settings.mode,
+
+                batch:settings.batch,
+
+                channel:settings.channel,
+
+                separateNorm:
+                    settings.separate_norm
+
+            }
+
+        );
+
+    }
+    catch(e){
+
+        console.log(
+            "draw error",
+            e
+        );
+
+    }
+    finally{
+
+        rendering=false;
+
+    }
 
 }
 
 
 
-
-
-
+// -----------------------------
+// websocket
+// -----------------------------
 
 function connectWS(){
 
@@ -389,82 +508,61 @@ function connectWS(){
         :
         "ws";
 
-
     const ws =
         new WebSocket(
-            proto+
-            "://"+
-            location.host+
+
+            proto +
+            "://" +
+            location.host +
             "/events"
+
         );
 
+    ws.onmessage =
+        e=>{
 
+            try{
 
-    ws.onmessage=e=>{
+                const msg =
+                    JSON.parse(
+                        e.data
+                    );
 
+                if(
+                    msg.type==="tensor_update"
+                ){
 
-        let msg;
+                    loadTensors();
 
+                }
 
-        try{
+            }
+            catch{}
 
-            msg=JSON.parse(e.data);
+        };
 
-        }
-        catch{
+    ws.onclose =
+        ()=>{
 
-            return;
+            setTimeout(
 
-        }
+                connectWS,
 
+                1000
 
+            );
 
-        if(
-            msg.type !==
-            "tensor_update"
-        )
-            return;
-
-
-
-        tensorVersions[msg.tensor]=
-            msg.version;
-
-
-
-        fetchState();
-
-
-
-        if(
-            msg.tensor===selectedTensor
-        ){
-
-            requestImage();
-
-        }
-
-    };
-
-
-
-    ws.onclose=()=>{
-
-        setTimeout(
-            connectWS,
-            1000
-        );
-
-    };
+        };
 
 }
 
 
 
-
+// -----------------------------
+// controls
+// -----------------------------
 
 function initControls(){
-
 
     $("tensorSelect")
     ?.addEventListener(
@@ -474,18 +572,15 @@ function initControls(){
             selectedTensor =
                 e.target.value;
 
-
             settings.batch=0;
             settings.channel=0;
 
-
             updateSliders();
 
-            requestImage();
+            scheduleDraw();
 
         }
     );
-
 
 
     $("modeSelect")
@@ -496,11 +591,10 @@ function initControls(){
             settings.mode =
                 e.target.value;
 
-            requestImage();
+            scheduleDraw();
 
         }
     );
-
 
 
     $("batchSlider")
@@ -509,18 +603,17 @@ function initControls(){
         e=>{
 
             settings.batch =
-                Number(e.target.value);
-
+                Number(
+                    e.target.value
+                );
 
             $("batchValue").textContent =
                 settings.batch;
 
-
-            requestImage();
+            scheduleDraw();
 
         }
     );
-
 
 
     $("channelSlider")
@@ -529,18 +622,17 @@ function initControls(){
         e=>{
 
             settings.channel =
-                Number(e.target.value);
-
+                Number(
+                    e.target.value
+                );
 
             $("channelValue").textContent =
                 settings.channel;
 
-
-            requestImage();
+            scheduleDraw();
 
         }
     );
-
 
 
     $("axesInput")
@@ -551,12 +643,8 @@ function initControls(){
             settings.axes =
                 e.target.value;
 
-
-            requestImage();
-
         }
     );
-
 
 
     $("separateNorm")
@@ -567,8 +655,7 @@ function initControls(){
             settings.separate_norm =
                 e.target.checked;
 
-
-            requestImage();
+            scheduleDraw();
 
         }
     );
@@ -577,19 +664,21 @@ function initControls(){
 
 
 
+// -----------------------------
+// start
+// -----------------------------
 
+window.onload =
+async()=>{
 
-window.addEventListener(
-    "load",
-    async ()=>{
+    initRenderer(
+        "tensorCanvas"
+    );
 
-        initControls();
+    initControls();
 
-        await fetchState();
+    await loadTensors();
 
-        requestImage();
+    connectWS();
 
-        connectWS();
-
-    }
-);
+};

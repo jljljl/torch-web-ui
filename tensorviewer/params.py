@@ -1,6 +1,7 @@
 import threading
 
 
+
 class ParameterStore:
 
 
@@ -8,25 +9,185 @@ class ParameterStore:
 
         self.data = {}
 
-        self.types = {}
-
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
 
+
+    # ---------------------------------------------
+    # register
+    # ---------------------------------------------
 
     def register(
             self,
             name,
-            dtype
+            dtype,
+            value=None
     ):
+
 
         with self.lock:
 
-            self.types[name] = dtype
+
+            if value is None:
+
+
+                if dtype == "int":
+
+                    value = 0
+
+
+                elif dtype == "float":
+
+                    value = 0.0
+
+
+                elif dtype == "bool":
+
+                    value = False
+
+
+                elif dtype == "string":
+
+                    value = ""
+
+
+                else:
+
+                    value = None
+
+
+
+            self.data[name] = {
+
+                "type": dtype,
+
+                "value": value
+
+            }
+
+
+
+
+    # ---------------------------------------------
+    # get
+    # ---------------------------------------------
+
+    def get(
+            self,
+            name
+    ):
+
+
+        with self.lock:
+
+            return self.data[name]["value"]
+
+
+
+
+    # ---------------------------------------------
+    # set
+    # ---------------------------------------------
+
+    def set(
+            self,
+            name,
+            value
+    ):
+
+
+        with self.lock:
+
 
             if name not in self.data:
 
-                self.data[name] = None
+                raise KeyError(
+                    name
+                )
+
+
+            dtype = self.data[name]["type"]
+
+
+
+            if dtype == "int":
+
+                value = int(value)
+
+
+            elif dtype == "float":
+
+                value = float(value)
+
+
+            elif dtype == "bool":
+
+                if isinstance(
+                    value,
+                    str
+                ):
+
+                    value = (
+                        value.lower()
+                        in
+                        (
+                            "1",
+                            "true",
+                            "yes"
+                        )
+                    )
+
+
+                else:
+
+                    value = bool(value)
+
+
+
+            elif dtype == "string":
+
+                value = str(value)
+
+
+
+            self.data[name]["value"] = value
+
+
+
+
+    # ---------------------------------------------
+    # json
+    # ---------------------------------------------
+
+    def get_dict(self):
+
+
+        with self.lock:
+
+            return {
+
+                name: {
+
+                    "type": item["type"],
+
+                    "value": item["value"]
+
+                }
+
+                for name, item
+                in self.data.items()
+
+            }
+
+
+
+
+    def __getitem__(
+            self,
+            name
+    ):
+
+        return self.get(name)
 
 
 
@@ -36,104 +197,13 @@ class ParameterStore:
             value
     ):
 
-        with self.lock:
-
-            if name not in self.types:
-
-                raise KeyError(
-                    f"Parameter '{name}' is not registered"
-                )
-
-
-            dtype = self.types[name]
-
-
-            value = self.validate(
-                value,
-                dtype
-            )
-
-
-            self.data[name] = value
-
-
-
-    def __getitem__(
-            self,
-            name
-    ):
-
-        with self.lock:
-
-            return self.data[name]
-
-
-
-    def validate(
-            self,
-            value,
-            dtype
-    ):
-
-        if dtype == "int":
-
-            if isinstance(value, bool):
-                raise ValueError(
-                    "bool is not int"
-                )
-
-            return int(value)
-
-
-
-        if dtype == "float":
-
-            return float(value)
-
-
-
-        if dtype == "str":
-
-            return str(value)
-
-
-
-        raise ValueError(
-            f"Unknown parameter type: {dtype}"
+        self.set(
+            name,
+            value
         )
 
 
 
-    def get_dict(self):
 
-        with self.lock:
-
-            return {
-
-                name: {
-
-                    "type": self.types[name],
-
-                    "value": self.data[name]
-
-                }
-
-                for name in self.types
-
-            }
-
-
-
-    def update(
-            self,
-            name,
-            value
-    ):
-
-        self[name] = value
-
-
-
-# global parameter storage
 
 params = ParameterStore()

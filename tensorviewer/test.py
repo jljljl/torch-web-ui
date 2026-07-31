@@ -127,7 +127,9 @@ def producer():
                 "layer2_weights",
                 model.conv2.weight
             )
-            print("update")
+            params["lr"] = params["lr"] + 1e-4
+            viewer.update_params()
+            # print("update")
             time.sleep(0.001)
 
 

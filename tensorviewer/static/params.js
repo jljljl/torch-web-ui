@@ -1,20 +1,43 @@
 let paramsTimer = null;
+
 let editingParam = null;
 
 
-async function loadParams() {
 
-    try {
+function $(id){
 
-        const r = await fetch("/params");
+    return document.getElementById(id);
 
-        const data = await r.json();
-
-
-        updateParams(data);
+}
 
 
-    } catch(e) {
+
+// --------------------------------------------------
+// load
+// --------------------------------------------------
+
+async function loadParams(){
+
+    try{
+
+
+        const r = await fetch(
+            "/params",
+            {
+                cache:"no-store"
+            }
+        );
+
+
+        const data =
+            await r.json();
+
+
+        renderParams(data);
+
+
+    }
+    catch(e){
 
         console.log(
             "params error",
@@ -22,151 +45,225 @@ async function loadParams() {
         );
 
     }
-}
-
-
-
-function createParamRow(
-        table,
-        name,
-        param
-) {
-
-    const row = document.createElement("div");
-
-    row.className = "param-row";
-
-    row.dataset.name = name;
-
-
-
-    const key = document.createElement("div");
-
-    key.className = "param-key";
-
-    key.innerText = name;
-
-
-
-    const value = document.createElement("input");
-
-    value.className = "param-value";
-
-    value.dataset.name = name;
-
-    value.dataset.type = param.type;
-
-
-    value.value = param.value ?? "";
-
-
-
-    value.onfocus = function() {
-
-        editingParam = name;
-
-    };
-
-
-
-    value.onblur = function() {
-
-        if (editingParam === name)
-            editingParam = null;
-
-        setParam(
-            name,
-            this.value
-        );
-
-    };
-
-
-
-    if (
-        param.type === "int" ||
-        param.type === "float"
-    ) {
-
-        value.oninput = function() {
-
-            this.value =
-                this.value.replace(
-                    /[^0-9eE+\-.]/g,
-                    ""
-                );
-
-        };
-
-    }
-
-
-
-    row.appendChild(key);
-
-    row.appendChild(value);
-
-
-    table.appendChild(row);
 
 }
 
 
 
-function updateParams(data) {
 
-    const table = document.getElementById(
-        "params-table"
-    );
+// --------------------------------------------------
+// render
+// --------------------------------------------------
+
+function renderParams(data){
 
 
-    if (!table)
+    const table =
+        $("params-table");
+
+
+    if(!table)
         return;
 
 
 
-    for (const name in data) {
-
-
-        const param = data[name];
-
-
-        let input = document.querySelector(
-            `.param-value[data-name="${name}"]`
-        );
+    const active =
+        editingParam;
 
 
 
-        if (!input) {
+    for(
+        const name in data
+    ){
 
-            createParamRow(
-                table,
-                name,
-                param
+
+        let row =
+            document.getElementById(
+                "param-" + name
             );
 
+
+
+        if(!row){
+
+
+            row =
+                document.createElement(
+                    "div"
+                );
+
+
+            row.className =
+                "param-row";
+
+
+            row.id =
+                "param-" + name;
+
+
+
+            const key =
+                document.createElement(
+                    "div"
+                );
+
+
+            key.className =
+                "param-key";
+
+
+            key.textContent =
+                name;
+
+
+
+            const value =
+                document.createElement(
+                    "input"
+                );
+
+
+            value.className =
+                "param-value";
+
+
+            value.dataset.name =
+                name;
+
+
+
+            value.addEventListener(
+                "focus",
+                ()=>{
+
+                    editingParam =
+                        name;
+
+                }
+            );
+
+
+
+            value.addEventListener(
+                "blur",
+                ()=>{
+
+                    editingParam =
+                        null;
+
+                }
+            );
+
+
+
+            value.addEventListener(
+                "change",
+                async ()=>{
+
+
+                    await setParam(
+
+                        name,
+
+                        value.value
+
+                    );
+
+
+                }
+            );
+
+
+
+            row.appendChild(
+                key
+            );
+
+
+            row.appendChild(
+                value
+            );
+
+
+            table.appendChild(
+                row
+            );
+
+        }
+
+
+
+        const input =
+            row.querySelector(
+                "input"
+            );
+
+
+
+        if(
+            active === name
+        ){
+
             continue;
 
         }
 
 
 
-        // не трогаем редактируемое поле
+        let value =
+            data[name].value;
 
-        if (
-            editingParam === name ||
-            document.activeElement === input
-        ) {
 
-            continue;
+
+        if(
+            typeof value === "object"
+        ){
+
+            value =
+                JSON.stringify(
+                    value
+                );
 
         }
 
 
 
-        input.value = param.value ?? "";
+        input.value =
+            value;
 
-        input.dataset.type = param.type;
+
+
+        input.dataset.type =
+            data[name].type;
+
+
+    }
+
+
+
+    // удаляем старые параметры
+
+    for(
+        const row of
+        Array.from(
+            table.children
+        )
+    ){
+
+        const name =
+            row.id.replace(
+                "param-",
+                ""
+            );
+
+
+        if(
+            !data[name]
+        ){
+
+            row.remove();
+
+        }
 
     }
 
@@ -174,31 +271,48 @@ function updateParams(data) {
 
 
 
+
+// --------------------------------------------------
+// set
+// --------------------------------------------------
+
 async function setParam(
         name,
         value
-) {
+){
 
-    try {
+
+    try{
+
 
         await fetch(
-            "/params/" + encodeURIComponent(name),
+
+            "/params/" + name,
+
             {
 
                 method:"POST",
 
                 headers:{
-                    "Content-Type":"application/json"
+
+                    "Content-Type":
+                    "application/json"
+
                 },
 
-                body:JSON.stringify(value)
+
+                body:
+                    JSON.stringify(
+                        value
+                    )
 
             }
+
         );
 
 
     }
-    catch(e) {
+    catch(e){
 
         console.log(
             "set param error",
@@ -211,21 +325,36 @@ async function setParam(
 
 
 
-function startParams() {
+
+
+// --------------------------------------------------
+// start
+// --------------------------------------------------
+
+function startParams(){
+
 
     loadParams();
 
 
-    paramsTimer = setInterval(
-        loadParams,
-        1000
-    );
+
+    paramsTimer =
+        setInterval(
+
+            loadParams,
+
+            1000
+
+        );
 
 }
 
 
 
 window.addEventListener(
+
     "load",
+
     startParams
+
 );

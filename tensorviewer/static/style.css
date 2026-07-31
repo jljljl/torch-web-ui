@@ -268,3 +268,15 @@ input[type="range"] {
     background:#444;
 
 }
+
+#tensorCanvas {
+
+    max-width:95%;
+    max-height:95%;
+
+    background:#000;
+
+    image-rendering:auto;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}

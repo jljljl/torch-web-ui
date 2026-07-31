@@ -1,9 +1,13 @@
 import threading
-import torch
+
 from queue import Queue
+
+import torch
+
 
 
 class TensorState:
+
 
     def __init__(self):
 
@@ -11,74 +15,146 @@ class TensorState:
 
         self.versions = {}
 
-        self.lock = threading.Lock()
-
         self.events = Queue()
 
 
+        self.lock = threading.RLock()
 
-    def update(self, name, tensor):
 
-        with self.lock:
 
-            self.tensors[name] = (
-                tensor
-                .detach()
-                .cpu()
-                .clone()
+    # ---------------------------------------------
+    # update
+    # ---------------------------------------------
+
+    def update(
+            self,
+            name,
+            tensor
+    ):
+
+
+        if not isinstance(
+            tensor,
+            torch.Tensor
+        ):
+
+            raise TypeError(
+                "expected torch.Tensor"
             )
 
 
-            self.versions[name] = (
-                self.versions.get(name,0)
-                + 1
+
+        with self.lock:
+
+
+            self.tensors[name] = tensor.detach()
+
+
+            version = (
+                self.versions.get(
+                    name,
+                    0
+                )
+                +
+                1
             )
 
 
-            version = self.versions[name]
-
-
-        # событие вне lock
-        self.events.put(
-            {
-                "tensor": name,
-                "version": version
-            }
-        )
+            self.versions[name] = version
 
 
 
-    def get(self,name):
+        self.events.put({
+
+            "tensor": name,
+
+            "version": version
+
+        })
+
+
+
+
+    # ---------------------------------------------
+    # get
+    # ---------------------------------------------
+
+    def get(
+            self,
+            name
+    ):
+
 
         with self.lock:
 
-            return self.tensors.get(name)
+            return self.tensors.get(
+                name
+            )
 
 
 
-    def get_version(self,name):
+
+    # ---------------------------------------------
+    # version
+    # ---------------------------------------------
+
+    def get_version(
+            self,
+            name
+    ):
+
 
         with self.lock:
 
-            return self.versions.get(name,0)
+            return self.versions.get(
+                name,
+                0
+            )
 
 
+
+
+    # ---------------------------------------------
+    # info
+    # ---------------------------------------------
 
     def info(self):
 
+
+        result = {}
+
+
         with self.lock:
 
-            return {
 
-                name:{
-                    "shape":list(t.shape),
-                    "dtype":str(t.dtype),
-                    "version":self.versions[name]
+            for name, tensor in self.tensors.items():
+
+
+                result[name] = {
+
+                    "shape":
+                        list(
+                            tensor.shape
+                        ),
+
+                    "dtype":
+                        str(
+                            tensor.dtype
+                        ),
+
+                    "version":
+                        self.versions.get(
+                            name,
+                            0
+                        )
+
                 }
 
-                for name,t in self.tensors.items()
 
-            }
+
+        return result
+
+
 
 
 state = TensorState()
